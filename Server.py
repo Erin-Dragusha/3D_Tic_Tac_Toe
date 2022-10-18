@@ -3,9 +3,14 @@ import socket
 BUF_SIZE = 1024
 HOST = ''
 PORT = 12345
-board = [[["_" for _ in range(4)] for _ in range(4)] for _ in range(4)]
+BOARD_SIZE = 4
+board = []
 turn = 1
 
+def createBoard():
+	global board
+	board = [[["_" for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
+	return board
 
 def getBoard():
 	boardString = ""
@@ -26,6 +31,62 @@ def displaySuccess(sc):
 def displayMessage(sc, message):
 	sc.sendall((message+"\n").encode())
 
+def putDataInBoard(sc, decodedData):
+	global turn, board
+	if len(decodedData) != 6:
+		displayError(sc)
+		print("Invalid number of inputs!")
+		return
+
+	level = decodedData[1]
+	row = decodedData[2]
+	col = decodedData[3]
+	inputRecord = decodedData[4]
+
+	if not level.isnumeric() or not row.isnumeric() or not col.isnumeric() or not inputRecord.isnumeric():
+		displayError(sc)
+		print("One of the arguments is NaN")
+		return
+
+	level = int(level)
+	row = int(row)
+	col = int(col)
+	inputRecord = int(inputRecord)
+
+	if inputRecord != turn:
+		displayError(sc)
+		print("Not your turn!")
+		return
+
+	try:
+		board[level][row][col]
+	except IndexError:
+		displayError(sc)
+		print("Out of bounds!")
+		return
+
+	if board[level][row][col] != '_':
+		displayError(sc)
+		print("Section occupied!")
+		return
+
+	board[level][row][col] = str(inputRecord)
+	displaySuccess(sc)
+	print("Sucessfully placed on board!")
+
+	if turn == 3:
+		turn = 1
+	else:
+		turn+=1	
+	
+def clearBoard():
+	global turn, board
+	board = createBoard()
+	turn = 1
+	displaySuccess(sc)
+	print("Board cleared!")
+
+board = createBoard()
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock: # TCP socket
 	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # Details later
 	sock.bind((HOST, PORT)) # Claim messages sent to port "PORT"
@@ -43,58 +104,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock: # TCP socket
 			if COMMAND == 'G':
 				displayMessage(sc, getBoard())
 			elif COMMAND == 'P':
-
-				if len(decodedData) != 6:
-					displayError(sc)
-					print("Invalid number of inputs!")
-					continue
-
-				
-				level = decodedData[1]
-				row = decodedData[2]
-				col = decodedData[3]
-				inputRecord = decodedData[4]
-
-				if not level.isnumeric() or not row.isnumeric() or not col.isnumeric() or not inputRecord.isnumeric():			
-					displayError(sc)
-					print("One of the arguments is NaN")
-					continue
-
-				level = int(level)	
-				row = int(row)	
-				col = int(col)
-				inputRecord = int(inputRecord)
-
-				if inputRecord != turn:
-					displayError(sc)
-					print("Not your turn!")
-					continue	
-
-				try:
-					board[level][row][col]
-				except IndexError:
-					displayError(sc)
-					print("Out of bounds!")
-					continue
-
-				if board[level][row][col] != '_':
-					displayError(sc)
-					print("Section occupied!")
-					continue
-
-				board[level][row][col] = str(inputRecord)
-				displaySuccess(sc)
-				print("Sucessfully placed on board!")
-
-				if turn == 3:
-					turn = 1
-				else:
-					turn+=1
+				putDataInBoard(sc, decodedData)
 			elif COMMAND == 'C':
-				turn = 1
-				board = [[["_" for _ in range(4)] for _ in range(4)] for _ in range(4)]
-				displaySuccess(sc)
-				print("Board cleared!")
+				clearBoard()
 			else:
 				displayError(sc)
 				print("Unknown command!")
